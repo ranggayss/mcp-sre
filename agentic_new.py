@@ -559,6 +559,7 @@ class ActionResult:
     success: bool
     timestamp: str = datetime.now().isoformat()
     references: List[Dict[str, str]] = field(default_factory=list)
+    usage_metadata: Optional[Dict[str, Any]] = field(default=None)
 
 @dataclass
 class LearningEvent:
@@ -1192,6 +1193,16 @@ class EnhancedActionModule:
                     success=False
             )
 
+            # Extract usage metadata
+            usage_metadata = None
+            if hasattr(response, 'usage_metadata'):
+                usage_metadata = {
+                    'input_tokens': response.usage_metadata.get('input_tokens', 0),
+                    'output_tokens': response.usage_metadata.get('output_tokens', 0),
+                    'total_tokens': response.usage_metadata.get('total_tokens', 0),
+                    'model_name': getattr(response, 'response_metadata', {}).get('model_name', 'unknown')
+            }
+
             # Get sources/references
             sources = self._extract_sources(unified_context)
             
@@ -1231,7 +1242,8 @@ class EnhancedActionModule:
                 response=formatted_response,
                 sources_used=reasoning_result.context_sources,
                 success=True,
-                references=sources
+                references=sources,
+                usage_metadata = usage_metadata
             )
         except Exception as e:
             return ActionResult(
