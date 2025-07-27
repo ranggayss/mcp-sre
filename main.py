@@ -279,6 +279,7 @@ async def handle_chat(request: ChatRequest):
             "success": True,
             "response": action_result.response,
             "references": action_result.references,
+            "usage_metadata": action_result.usage_metadata,
             "metadata": {
                 "perception": perception_data.__dict__,
                 "reasoning": reasoning_result.__dict__,
@@ -384,6 +385,8 @@ async def process_text_internal(text: str, request: ProcessPDFRequest) -> dict:
             logger.info(f"DEBUG: generated_article_node before returning: {generated_article_node}")
 
             generated_article_node['att_url'] = request.pdf_url
+
+            token_usage = generated_article_node.pop('token_usage', {})
         
             return {
                 "success": True,
@@ -392,7 +395,8 @@ async def process_text_internal(text: str, request: ProcessPDFRequest) -> dict:
                 "document_ids": stored_ids,
                 "node_id": node_id,
                 "session_id": request.session_id,
-                "generated_article_node": generated_article_node
+                "generated_article_node": generated_article_node,
+                "token_usage": token_usage
             }
         
         except Exception as e:
@@ -468,11 +472,27 @@ Berikan hanya **JSON murni** tanpa teks tambahan atau blok kode markdown (sepert
     try:
         response = await model_flash.ainvoke(prompt)
         text_output = response.content.strip()
+
+        #extract token usage
+        token_usage = {'input_tokens': 0, 'output_tokens': 0, 'total_tokens': 0}
+        
+        if hasattr(response, 'usage_metadata') and response.usage_metadata:
+            usage = response.usage_metadata
+            # logger.info(f"🔍 Found usage_metadata: {response.usage_metadata}")
+            token_usage = {
+                'input_tokens': usage.get('input_tokens', 0),
+                'output_tokens': usage.get('output_tokens', 0),
+                'total_tokens': usage.get('total_tokens', 0)
+            }
+            logger.info(f"✅ Successfully extracted token usage: {token_usage}")
+        else:
+            logger.warning("⚠️ No usage_metadata found in response")
         
         cleaned_output = text_output.replace("```json", "").replace("```", "").strip()
 
-        logger.info(f"🧠 Raw Gemini (summary) output:\n{text_output[:500]}...")
-        logger.info(f"🧹 Cleaned JSON (summary):\n{cleaned_output[:500]}...")
+        # logger.info(f"🧠 Raw Gemini (summary) output:\n{text_output[:500]}...")
+        # logger.info(f"🧹 Cleaned JSON (summary):\n{cleaned_output[:500]}...")
+        logger.info(f"📊 Token usage: {token_usage}")
 
         parsed_node = json.loads(cleaned_output)
 
@@ -485,6 +505,9 @@ Berikan hanya **JSON murni** tanpa teks tambahan atau blok kode markdown (sepert
         parsed_node['att_background'] = parsed_node.get('att_background', '')
         parsed_node['att_future'] = parsed_node.get('att_future', '')
         parsed_node['att_gaps'] = parsed_node.get('att_gaps', '')
+
+        #add token usage to the result
+        parsed_node['token_usage'] = token_usage
         
         return parsed_node
     except Exception as e:
@@ -498,14 +521,24 @@ Berikan hanya **JSON murni** tanpa teks tambahan atau blok kode markdown (sepert
             "att_method": "",
             "att_background": "",
             "att_future": "",
-            "att_gaps": ""
+            "att_gaps": "",
+            "token_usage": {'input_tokens': 0, 'output_tokens': 0, 'total_tokens': 0}
         }
 
 # --- FUNGSI AI: Generate Edges Antar Nodes yang Diberikan ---
 async def generate_edges_from_all_nodes(all_nodes_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    default_token_usage = {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "total_tokens": 0,
+    }
     if len(all_nodes_data) < 2:
         logger.info("Less than 2 nodes for edge generation. Returning empty list.")
-        return []
+        # return []
+        return {
+            "edges": [],
+            "token_usage": default_token_usage
+        }
 
     prompt = f"Anda adalah asisten AI yang bertugas menganalisis hubungan semantik antar artikel ilmiah berdasarkan isi kontennya.\n"
     prompt += f"Semua konten di bawah ini ditulis dalam **Bahasa Indonesia**. Fokus pada kemiripan makna, bukan sekadar kemiripan kata.\n"
@@ -551,6 +584,22 @@ async def generate_edges_from_all_nodes(all_nodes_data: List[Dict[str, Any]]) ->
         response = await model_flash.ainvoke(prompt) 
         text_output = response.content.strip()
 
+
+        # Extract token usage information
+        token_usage = default_token_usage.copy()
+        
+        if hasattr(response, 'usage_metadata') and response.usage_metadata:
+            usage = response.usage_metadata  # Dictionary
+            token_usage = {
+                'input_tokens': usage.get('input_tokens', 0),
+                'output_tokens': usage.get('output_tokens', 0),
+                'total_tokens': usage.get('total_tokens', 0)
+            }
+            logger.info(f"✅ Successfully extracted edge token usage: {token_usage}")
+        else:
+            logger.warning("⚠️ No usage_metadata found in edge response")
+
+
         json_str = ""
         if "```json" in text_output and "```" in text_output:
             start_idx = text_output.find("```json") + len("```json")
@@ -562,17 +611,28 @@ async def generate_edges_from_all_nodes(all_nodes_data: List[Dict[str, Any]]) ->
         else:
             json_str = text_output
 
-        logger.info(f"🧠 Raw Gemini (edges) output:\n{text_output[:500]}...")
-        logger.info(f"🧹 Extracted JSON (edges):\n{json_str[:500]}...")
+        # logger.info(f"🧠 Raw Gemini (edges) output:\n{text_output[:500]}...")
+        # logger.info(f"🧹 Extracted JSON (edges):\n{json_str[:500]}...")
+        logger.info(f"📊 Edge generation token usage: {token_usage}")
 
         edges = json.loads(json_str)
         if isinstance(edges, list):
-            return edges
+            return {
+                "edges": edges,
+                "token_usage": token_usage
+            }
+        
         logger.warning(f"AI response for edges was not a list: {edges}")
-        return []
+        return {
+            "edges": edges,
+            "token_usage": token_usage
+        }
     except Exception as e:
         logger.error(f"❌ Failed to generate edges with AI: {traceback.format_exc()}")
-        return []
+        return {
+            "edges": edges,
+            "token_usage": token_usage
+        }
 
 
 # @app.post("/api/suggestions")
