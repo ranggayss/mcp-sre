@@ -43,7 +43,7 @@ if not GOOGLE_API_KEY:
 
 print(f"Using Google API Key: {GOOGLE_API_KEY[:5]}...")  # Debugging
 
-model_flash = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=GOOGLE_API_KEY)
+model_flash = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=GOOGLE_API_KEY)
 
 class ProcessPDFRequest(BaseModel):
     pdf_url: str
