@@ -389,48 +389,48 @@ class WebSearchMCPProvider(MCPProvider):
             # logger.info(f"Executing web search for: '{query}'") # Tambah kutip untuk melihat query kosong
             
             # Execute search with timeout
-            search_results = await asyncio.wait_for(
-                asyncio.get_event_loop().run_in_executor(
-                    None,
-                    lambda: self.search_tool.run(query)
-                ),
-                timeout=15.0
-            )
+            # search_results = await asyncio.wait_for(
+            #     asyncio.get_event_loop().run_in_executor(
+            #         None,
+            #         lambda: self.search_tool.run(query)
+            #     ),
+            #     timeout=15.0
+            # )
             
-            # Validate search results
-            if not search_results:
-                logger.warning("Empty search results from DuckDuckGo.")
-                search_results = "No search results found"
-            elif not isinstance(search_results, str):
-                # logger.warning(f"Unexpected search result type: {type(search_results)}. Converting to string.")
-                search_results = str(search_results)
+            # # Validate search results
+            # if not search_results:
+            #     logger.warning("Empty search results from DuckDuckGo.")
+            #     search_results = "No search results found"
+            # elif not isinstance(search_results, str):
+            #     # logger.warning(f"Unexpected search result type: {type(search_results)}. Converting to string.")
+            #     search_results = str(search_results)
             
             # Process with agent if available
-            if self.search_agent:
-                try:
-                    processed_results = await asyncio.wait_for(
-                        asyncio.get_event_loop().run_in_executor(
-                            None,
-                            lambda: self.search_agent.run(f"Summarize and structure this search result: {search_results[:1000]}")
-                        ),
-                        timeout=10.0
-                    )
+            # if self.search_agent:
+            #     try:
+            #         processed_results = await asyncio.wait_for(
+            #             asyncio.get_event_loop().run_in_executor(
+            #                 None,
+            #                 lambda: self.search_agent.run(f"Summarize and structure this search result: {search_results[:1000]}")
+            #             ),
+            #             timeout=10.0
+            #         )
                     
-                    if processed_results and hasattr(processed_results, 'content'):
-                        search_results = processed_results.content
-                    elif processed_results:
-                        search_results = str(processed_results)
+            #         if processed_results and hasattr(processed_results, 'content'):
+            #             search_results = processed_results.content
+            #         elif processed_results:
+            #             search_results = str(processed_results)
                         
-                except asyncio.TimeoutError:
-                    logger.warning("Agent processing timeout, using raw results.")
-                except Exception as e:
-                    logger.warning(f"Agent processing failed: {e}, using raw results.", exc_info=True) # Tambah exc_info
+            #     except asyncio.TimeoutError:
+            #         logger.warning("Agent processing timeout, using raw results.")
+            #     except Exception as e:
+            #         logger.warning(f"Agent processing failed: {e}, using raw results.", exc_info=True) # Tambah exc_info
             
             # logger.info(f"Web search completed for query '{query}': {len(search_results)} characters.") # Tambah kutip
             
             return {
                 **base_response,
-                "results": search_results,
+                # "results": search_results,
                 "success": True
             }
                 
@@ -576,7 +576,7 @@ class EnhancedPerceptionModule:
     def __init__(self):
         self.entity_extractor = Agent(
             name="Entity Extractor",
-            model=Gemini(id="gemini-2.0-flash"),
+            model=Gemini(id="gemini-2.5-flash"),
             instructions="Extract entities and analyze user intent from text.",
             markdown=False,
             tools=[],
@@ -686,7 +686,7 @@ class EnhancedReasoningModule:
 
 class EnhancedActionModule:
     def __init__(self):
-        self.response_agent = ChatGoogleGenerativeAI(model="gemini-2.0-flash")
+        self.response_agent = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
     
     def _build_context_text(self, unified_context: Dict[str, Any]) -> str:
         """Build context text with comprehensive error handling"""
@@ -1158,7 +1158,10 @@ class EnhancedActionModule:
             if not context_text:
                 context_text = "No context available"
             
-            prompt = f"""**IMPORTANT**: The response MUST be in the same language as the user's question.
+            prompt = f"""**IMPORTANT**: The response MUST be in the same language as the user's question. 
+            1. AND DONT ANSWER IT WITH THE TITLE OF THE CONTEXT (THE PDF OR ARTICLE) IF IT IS HAS NO RELEVANTION WITH THE QUESTION. I WILL GIVE YOU EXAMPLE, IF THE CONTEXT HAS LIKE "ARTIKEL" OR "DARI..." DONT INCLUDE IT JUST SKIP IT AND JUST GIVE A SMALL REVIEW IF IT HAS NO RELEVANTION WITH QUESTION. EVEN IF IT HAS RELEVANT BUT IF IT DOESNT HAVE GRAPH KNOWLEDGE OR GRAPH BASE DONT INCLUDE THE TITLE AND JUST GIVE IT A BASIC ANSWER OR GENERAL ANSWER
+
+            2. BUT IF IT HAS THE GRAPH KNOWLEDGE OR GRAPH BASE YOU CAN ANSWER IT WITH THE TITLE AND SO ON.
             
             **Task**: Answer the question thoroughly and provide detailed explanations based on the provided context. If the context contains distinct points or sections, elaborate on each of them.
             
