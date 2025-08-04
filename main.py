@@ -205,6 +205,24 @@ async def handle_chat(request: ChatRequest):
         context_edge_ids = request.context_edge_ids or []
         context_article_ids = request.context_article_ids or []
 
+        if (not context_node_ids and 
+            not context_edge_ids and 
+            not context_article_ids and 
+            not request.node_id and 
+            not request.node_ids):
+            
+            return {
+                "success": True,
+                "response": "Anda belum memilih node",
+                "references": [],
+                "usage_metadata": None,
+                "metadata": {
+                    "perception": {},
+                    "reasoning": {},
+                    "action": {"action_type": "no_context"}
+                }
+            }
+
         if context_node_ids or context_edge_ids:
             graph_context = await graph_service.get_graph_context(
                 context_node_ids,
