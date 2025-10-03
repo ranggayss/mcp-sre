@@ -7,8 +7,7 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from typing import List, Dict, Any, Optional
 import uuid
 from dotenv import load_dotenv
-
-from langchain_openai import OpenAIEmbeddings
+from langchain.embeddings import OpenAIEmbeddings
 
 load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
