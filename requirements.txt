@@ -33,11 +33,11 @@ hyperframe==6.1.0
 idna==3.10
 jsonpatch==1.33
 jsonpointer==3.0.0
-langchain==0.3.26
-langchain-community==0.3.27
-langchain-core==0.3.71
-langchain-google-genai==2.1.8
-langchain-text-splitters==0.3.8
+langchain
+langchain-community
+langchain-core
+langchain-google-genai
+langchain-text-splitters
 langsmith==0.4.8
 lxml==6.0.0
 marshmallow==3.26.1
@@ -82,6 +82,6 @@ uvicorn==0.35.0
 websockets==15.0.1
 yarl==1.20.1
 zstandard==0.23.0
-langchain-openai==0.3.33
-langchain-openai==0.3.33
-openai==1.109.1
+langchain-openai
+langchain-openai
+openai
