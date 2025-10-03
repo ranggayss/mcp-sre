@@ -8,6 +8,8 @@ from typing import List, Dict, Any, Optional
 import uuid
 from dotenv import load_dotenv
 
+from langchain_openai import OpenAIEmbeddings
+
 load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 if not GOOGLE_API_KEY:
@@ -23,10 +25,14 @@ logger = logging.getLogger(__name__)
 
 
 # --- Inisialisasi Sistem ---
-COLLECTION_NAME = "documents"
-EMBEDDING_MODEL = GoogleGenerativeAIEmbeddings(
-    model="models/embedding-001",
-    google_api_key=os.getenv("GOOGLE_API_KEY")
+# COLLECTION_NAME = "documents"
+# EMBEDDING_MODEL = GoogleGenerativeAIEmbeddings(
+#     model="models/embedding-001",
+#     google_api_key=os.getenv("GOOGLE_API_KEY")
+# )
+EMBEDDING_MODEL = OpenAIEmbeddings(
+    model="text-embedding-3-small",   # atau "text-embedding-3-large"
+    openai_api_key=GOOGLE_API_KEY
 )
 
 class SupabaseVectorDb:
