@@ -16,6 +16,9 @@ import logging
 from fastapi.logger import logger as fastapi_logger
 from langchain_core.messages import HumanMessage
 
+from langchain_openai import ChatOpenAI
+import os
+
 # --- MCP Protocol Implementation ---
 # Configure logging
 logging.basicConfig(
@@ -686,7 +689,8 @@ class EnhancedReasoningModule:
 
 class EnhancedActionModule:
     def __init__(self):
-        self.response_agent = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
+        # self.response_agent = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
+        self.response_agent = ChatOpenAI(model="gpt-4o", openai_api_key=os.getenv("GOOGLE_API_KEY"))
     
     def _build_context_text(self, unified_context: Dict[str, Any]) -> str:
         """Build context text with comprehensive error handling"""

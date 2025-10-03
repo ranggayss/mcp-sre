@@ -25,6 +25,9 @@ from fastapi.logger import logger as fastapi_logger
 import json
 import uvicorn
 
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -43,7 +46,8 @@ if not GOOGLE_API_KEY:
 
 print(f"Using Google API Key: {GOOGLE_API_KEY[:5]}...")  # Debugging
 
-model_flash = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=GOOGLE_API_KEY)
+# model_flash = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=GOOGLE_API_KEY)
+model_flash = ChatOpenAI(model="gpt-4o", openai_api_key=GOOGLE_API_KEY)
 
 class ProcessPDFRequest(BaseModel):
     pdf_url: str
@@ -65,7 +69,12 @@ app.add_middleware(
 
 COLLECTION_NAME = "documents"
 TABLE_NAME = "documents"
-EMBEDDING_MODEL = GoogleGenerativeAIEmbeddings(model="models/embedding-001",google_api_key=os.getenv("GOOGLE_API_KEY"))
+# EMBEDDING_MODEL = GoogleGenerativeAIEmbeddings(model="models/embedding-001",google_api_key=os.getenv("GOOGLE_API_KEY"))
+# Di main.py, ganti ke OpenAI juga
+EMBEDDING_MODEL = OpenAIEmbeddings(
+    model="text-embedding-3-small",
+    openai_api_key=GOOGLE_API_KEY
+)
 
 class SupabaseVectorWrapper:
     """Wrapper untuk SupabaseVectroDb agar kompatibel"""
