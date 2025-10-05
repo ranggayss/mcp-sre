@@ -472,29 +472,80 @@ def preprocess_indonesian_text(text: str) -> str:
 
 # --- FUNGSI AI: Generate Satu Node Ringkasan Artikel ---
 async def generate_article_summary_node(text: str) -> Dict[str, Any]:
-    truncated_text = text[:50000] 
+    truncated_text = text[:50000]
 
     prompt = f"""
-Berikut adalah isi artikel ilmiah:
+Anda adalah agen ekstraksi informasi ahli yang membangun knowledge graph untuk penelitian akademik.
 
+TUGAS UTAMA:
+Ekstrak informasi terkstruktur dari artikel ilmiah berikut dalam format JSON. Gunakan urutan prioritas ekstraksi:
+1. **Cari frasa eksplisist** dalam teks yang relevan
+2. **Inferensi dari konteks** jika tidak ada frasa eksplisit
+3. Hanya isi **"Tidak ditemukan"** jika benar-benar tidak ada informasi sama sekali
+
+ARTIKEL ILMIAH:
 "{truncated_text}"
 
-Buat **satu** ringkasan artikel ilmiah dalam format JSON dengan struktur:
+ATRIBUT YANG HARUS DIEKSTRAK:
+- **title**: Judul artikel (ekstrak dari bagian judul dokumen)
+- **content**: Ringkasan komprehensif seluruh artikel (maksimal 1000 kata, Bahasa Indonesia)
+- **att_background** (Latar Belakang Penelitian): 
+  Cari kata kunci: "latar belakang", "pendahuluan", "konteks penelitian", "motivasi"
+  Jika tidak ada, inferensi dari bagian awal/pengantar dokumen
+- **att_goal** (Tujuan Penelitian): 
+  Cari kata kunci: "tujuan", "sasaran penelitian", "maksud", "aims", "objectives"
+  Jika tidak ada, inferensi dari implikasi latar belakang atau hasil yang diharapkan
+- **att_method** (Metodologi): 
+  Cari kata kunci: "metode", "metodologi", "pendekatan", "prosedur", "teknik penelitian"
+  Jika tidak ada, inferensi dari deskripsi proses/langkah-langkah penelitian
+- **att_future** (Penelitian Lanjutan): 
+  Cari kata kunci: "penelitian lanjutan", "future work", "rekomendasi", "saran penelitian", "studi lebih lanjut"
+  Jika tidak ada, inferensi dari kesimpulan atau implikasi hasil
+- **att_gaps** (Gap/Keterbatasan Penelitian): 
+  Cari kata kunci: "keterbatasan", "kekurangan", "gap penelitian", "limitation", "tantangan"
+  Jika tidak ada, inferensi dari pembahasan kelemahan metode/ruang lingkup
+
+FORMAT OUTPUT (JSON MURNI):
 {{
   "label": "Ringkasan Artikel",
   "type": "article",
-  "title": "Judul Artikel (dari teks artikel, jika ada)",
-  "content": "Rangkuman umum dari isi artikel (maksimal 1000 kata, dalam Bahasa Indonesia)",
-  "att_goal": "Tujuan dari penelitian ini",
-  "att_method": "Metodologi yang digunakan",
-  "att_background": "Latar belakang penelitian",
-  "att_future": "Arahan penelitian masa depan",
-  "att_gaps": "Kekurangan atau gap dari penelitian"
+  "title": "Judul Artikel dari Teks",
+  "content": "Ringkasan komprehensif artikel dalam Bahasa Indonesia...",
+  "att_goal": "Tujuan penelitian yang diekstrak atau diinferensi...",
+  "att_method": "Metodologi yang diekstrak atau diinferensi...",
+  "att_background": "Latar belakang yang diekstrak atau diinferensi...",
+  "att_future": "Arahan penelitian masa depan yang diekstrak atau diinferensi...",
+  "att_gaps": "Gap penelitian yang diekstrak atau diinferensi..."
 }}
 
-Pastikan semua field terisi. Jika informasi tidak ada dalam teks, tulis string kosong ("").
-Berikan hanya **JSON murni** tanpa teks tambahan atau blok kode markdown (seperti ```json).
+ATURAN PENTING:
+✓ Berikan HANYA JSON murni tanpa blok kode markdown (```json)
+✓ Semua field HARUS terisi (gunakan inferensi kontekstual sebelum "Tidak ditemukan")
+✓ Gunakan Bahasa Indonesia yang natural dan akademis
+✓ Fokus pada informasi substantif, bukan filler text
     """
+
+#     prompt = f"""
+# Berikut adalah isi artikel ilmiah:
+
+# "{truncated_text}"
+
+# Buat **satu** ringkasan artikel ilmiah dalam format JSON dengan struktur:
+# {{
+#   "label": "Ringkasan Artikel",
+#   "type": "article",
+#   "title": "Judul Artikel (dari teks artikel, jika ada)",
+#   "content": "Rangkuman umum dari isi artikel (maksimal 1000 kata, dalam Bahasa Indonesia)",
+#   "att_goal": "Tujuan dari penelitian ini",
+#   "att_method": "Metodologi yang digunakan",
+#   "att_background": "Latar belakang penelitian",
+#   "att_future": "Arahan penelitian masa depan",
+#   "att_gaps": "Kekurangan atau gap dari penelitian"
+# }}
+
+# Pastikan semua field terisi. Jika informasi tidak ada dalam teks, tulis string kosong ("").
+# Berikan hanya **JSON murni** tanpa teks tambahan atau blok kode markdown (seperti ```json).
+#     """
 
     try:
         response = await model_flash.ainvoke(prompt)
@@ -567,45 +618,107 @@ async def generate_edges_from_all_nodes(all_nodes_data: List[Dict[str, Any]]) ->
             "token_usage": default_token_usage
         }
 
-    prompt = f"Anda adalah asisten AI yang bertugas menganalisis hubungan semantik antar artikel ilmiah berdasarkan isi kontennya.\n"
-    prompt += f"Semua konten di bawah ini ditulis dalam **Bahasa Indonesia**. Fokus pada kemiripan makna, bukan sekadar kemiripan kata.\n"
-    prompt += f"Setiap artikel memiliki atribut berikut:\n- Judul\n- Tujuan\n- Metodologi\n- Latar Belakang\n- Arahan Penelitian Masa Depan\n- Gap/Kekurangan Penelitian\n\n"
+    prompt = f"""
+Anda adalah agen analisis relasi semantik untuk knowledge graph penelitian akademik.
 
-    prompt += f"Tugas Anda adalah menganalisis kemungkinan **hubungan semantik** antar artikel. Jenis hubungan tersebut meliputi:\n"
-    prompt += f"- same_background: artikel memiliki latar belakang atau konteks yang serupa\n"
-    prompt += f"- extended_method: artikel B mengembangkan atau membangun dari metode artikel A\n"
-    prompt += f"- shares_goal: artikel memiliki tujuan yang sama atau saling melengkapi\n"
-    prompt += f"- follows_future_work: artikel mengikuti atau mewujudkan arahan masa depan dari artikel lain\n"
-    prompt += f"- addresses_same_gap: kedua artikel mencoba mengatasi kekurangan atau gap penelitian yang sama\n\n"
+TUGAS UTAMA:
+Analisis hubungan semantik antar artikel ilmiah berdasarkan kemiripan KONTEN dan MAKNA (bukan hanya kata).
+Semua konten dalam **Bahasa Indonesia**.
+
+JENIS RELASI YANG VALID:
+1. **same_background**: Artikel memiliki latar belakang penelitian yang serupa atau terkait
+2. **extended_method**: Artikel B mengembangkan/membangun dari metodologi artikel A
+3. **shares_goal**: Artikel memiliki tujuan penelitian yang sama atau komplementer
+4. **follows_future_work**: Artikel mewujudkan atau mengikuti arahan penelitian masa depan artikel lain
+5. **addresses_same_gap**: Kedua artikel mencoba mengatasi gap/keterbatasan yang sama
+
+KRITERIA PEMBUATAN RELASI:
+✓ Harus ada **kemiripan semantik yang signifikan** (bukan hanya kesamaan topik umum)
+✓ Fokus pada **aspek spesifik** (metode, tujuan, gap) bukan sekadar topik luas
+✓ Berikan label deskriptif yang **menyebutkan judul artikel** dan jelaskan kemiripannya
+
+ARTIKEL YANG AKAN DIANALISIS:
+    """
+    # prompt = f"Anda adalah asisten AI yang bertugas menganalisis hubungan semantik antar artikel ilmiah berdasarkan isi kontennya.\n"
+    # prompt += f"Semua konten di bawah ini ditulis dalam **Bahasa Indonesia**. Fokus pada kemiripan makna, bukan sekadar kemiripan kata.\n"
+    # prompt += f"Setiap artikel memiliki atribut berikut:\n- Judul\n- Tujuan\n- Metodologi\n- Latar Belakang\n- Arahan Penelitian Masa Depan\n- Gap/Kekurangan Penelitian\n\n"
+
+    # prompt += f"Tugas Anda adalah menganalisis kemungkinan **hubungan semantik** antar artikel. Jenis hubungan tersebut meliputi:\n"
+    # prompt += f"- same_background: artikel memiliki latar belakang atau konteks yang serupa\n"
+    # prompt += f"- extended_method: artikel B mengembangkan atau membangun dari metode artikel A\n"
+    # prompt += f"- shares_goal: artikel memiliki tujuan yang sama atau saling melengkapi\n"
+    # prompt += f"- follows_future_work: artikel mengikuti atau mewujudkan arahan masa depan dari artikel lain\n"
+    # prompt += f"- addresses_same_gap: kedua artikel mencoba mengatasi kekurangan atau gap penelitian yang sama\n\n"
 
     for idx, node in enumerate(all_nodes_data):
-        prompt += f"Artikel {idx + 1} (ID: {node.get('id')}, Judul : \"{node.get('title', 'Untitled')}\"):\n"
-        prompt += f"- Judul: {node.get('title', '')}\n"
-        prompt += f"- Tujuan: {node.get('att_goal', '')}\n"
-        prompt += f"- Metodologi: {node.get('att_method', '')}\n"
-        prompt += f"- Latar Belakang: {node.get('att_background', '')}\n"
-        prompt += f"- Arahan Masa Depan: {node.get('att_future', '')}\n"
-        prompt += f"- Gap/Kekurangan: {node.get('att_gaps', '')}\n"
-        prompt += f"- URL: {node.get('att_url', '')}\n\n"
+        # prompt += f"Artikel {idx + 1} (ID: {node.get('id')}, Judul : \"{node.get('title', 'Untitled')}\"):\n"
+        # prompt += f"- Judul: {node.get('title', '')}\n"
+        # prompt += f"- Tujuan: {node.get('att_goal', '')}\n"
+        # prompt += f"- Metodologi: {node.get('att_method', '')}\n"
+        # prompt += f"- Latar Belakang: {node.get('att_background', '')}\n"
+        # prompt += f"- Arahan Masa Depan: {node.get('att_future', '')}\n"
+        # prompt += f"- Gap/Kekurangan: {node.get('att_gaps', '')}\n"
+        # prompt += f"- URL: {node.get('att_url', '')}\n\n"
+        prompt += f"""
+--- Artikel {idx + 1} ---
+ID: {node.get('id')}
+Judul: {node.get('title', 'Untitled')}
+Latar Belakang: {node.get('att_background', 'N/A')}
+Tujuan: {node.get('att_goal', 'N/A')}
+Metodologi: {node.get('att_method', 'N/A')}
+Arahan Masa Depan: {node.get('att_future', 'N/A')}
+Gap/Keterbatasan: {node.get('att_gaps', 'N/A')}
 
-    prompt += f"Sekarang kembalikan sebuah array JSON yang berisi relasi (\"edges\") antar artikel.\n"
-    prompt += f"Format setiap elemen:\n\n"
-    prompt += f"[\n"
-    prompt += f"  {{\n"
-    prompt += f"    \"from\": <id_artikel_sumber>,\n"
-    prompt += f"    \"to\": <id_artikel_tujuan>,\n"
-    prompt += f"    \"relation\": \"<jenis_relasi>\",\n"
-    prompt += f"    \"label\": \"<deskripsi singkat dalam Bahasa Indonesia>\"\n"
-    prompt += f"  }}\n"
-    prompt += f"]\n\n"
-    prompt += f"Jika tidak ada relasi, cukup kembalikan array kosong [] tanpa penjelasan tambahan.\n"
-    prompt += f"Tolong **bungkus jawaban JSON dalam blok kode seperti berikut**:\n\n"
-    prompt += "```json\n"
-    prompt += "[ ... ]\n"
-    prompt += "```\n"
-    prompt += f"Gunakan **judul artikel** (bukan hanya ID atau \"Artikel 1\") dalam deskripsi relasi. \n"
-    prompt += f"Contoh label yang baik:\n"
-    prompt += f"- \"Artikel 'Analisis Usability Aplikasi XYZ' menggunakan metode yang disederhanakan dari artikel 'Studi SEM-PLS pada Aplikasi XYZ'\"\n\n"
+"""
+
+    prompt += f"""
+OUTPUT FORMAT:
+Kembalikan array JSON dengan relasi yang ditemukan. Format setiap elemen:
+
+```json
+[
+  {{
+    "from": "<id_artikel_sumber>",
+    "to": "<id_artikel_tujuan>",
+    "relation": "<jenis_relasi>",
+    "label": "<deskripsi SPESIFIK dalam Bahasa Indonesia yang menyebutkan judul artikel>"
+  }}
+]
+```
+
+CONTOH LABEL YANG BAIK:
+✓ "Artikel 'Evaluasi Usability Sistem XYZ' menggunakan metode yang disederhanakan dari artikel 'Studi Komprehensif SEM-PLS pada Sistem XYZ'"
+✓ "Artikel 'Analisis Faktor Adopsi E-Learning' dan 'Implementasi Platform Digital Learning' sama-sama bertujuan meningkatkan efektivitas pembelajaran online"
+
+CONTOH LABEL YANG BURUK:
+✗ "Keduanya membahas topik yang sama"
+✗ "Artikel 1 dan Artikel 2 terkait"
+
+ATURAN:
+- Jika TIDAK ada relasi semantik yang signifikan, kembalikan array kosong: []
+- Jangan buat relasi hanya berdasarkan topik umum yang sama
+- Setiap relasi harus memiliki justifikasi yang jelas dan spesifik
+- Bungkus output dalam blok ```json ... ```
+"""
+    
+    # prompt += f"Sekarang kembalikan sebuah array JSON yang berisi relasi (\"edges\") antar artikel.\n"
+    # prompt += f"Format setiap elemen:\n\n"
+    # prompt += f"[\n"
+    # prompt += f"  {{\n"
+    # prompt += f"    \"from\": <id_artikel_sumber>,\n"
+    # prompt += f"    \"to\": <id_artikel_tujuan>,\n"
+    # prompt += f"    \"relation\": \"<jenis_relasi>\",\n"
+    # prompt += f"    \"label\": \"<deskripsi singkat dalam Bahasa Indonesia>\"\n"
+    # prompt += f"  }}\n"
+    # prompt += f"]\n\n"
+    # prompt += f"Jika tidak ada relasi, cukup kembalikan array kosong [] tanpa penjelasan tambahan.\n"
+    # prompt += f"Tolong **bungkus jawaban JSON dalam blok kode seperti berikut**:\n\n"
+    # prompt += "```json\n"
+    # prompt += "[ ... ]\n"
+    # prompt += "```\n"
+    # prompt += f"Gunakan **judul artikel** (bukan hanya ID atau \"Artikel 1\") dalam deskripsi relasi. \n"
+    # prompt += f"Contoh label yang baik:\n"
+    # prompt += f"- \"Artikel 'Analisis Usability Aplikasi XYZ' menggunakan metode yang disederhanakan dari artikel 'Studi SEM-PLS pada Aplikasi XYZ'\"\n\n"
 
     try:
         response = await model_flash.ainvoke(prompt) 
