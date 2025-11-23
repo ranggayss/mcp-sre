@@ -685,6 +685,6 @@ if __name__ == "__main__":
     server = create_mcp_server(args.transport)
     if args.transport == "http":
         # Panggil uvicorn.run() langsung, JANGAN di dalam fungsi async
-        uvicorn.run(server.transport.app, host="0.0.0.0", port=8000)
+        uvicorn.run(server.transport.app, host="0.0.0.0", port=9200)
     else:
         asyncio.run(server.start())
